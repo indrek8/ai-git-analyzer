@@ -574,8 +574,13 @@ body {
 }
 
 .repo-selection-item.selected {
-    border-color: #27ae60;
-    background: #d5f4e6;
+    /* Default styling - no special background color */
+    border-color: #3498db;
+}
+
+.repo-selection-item.pending {
+    border-color: #f39c12;
+    background: #fef9e7;
 }
 
 .repo-selection-item.synced {
@@ -655,7 +660,7 @@ body {
 }
 
 .status-selected {
-    background: #27ae60;
+    background: #3498db;
 }
 
 .status-deselected {
