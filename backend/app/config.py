@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # GitHub Integration
     github_client_id: Optional[str] = None
     github_client_secret: Optional[str] = None
+    github_oauth_redirect_uri: str = "http://localhost:8000/api/github/oauth/callback"
+    github_oauth_scopes: str = "repo,read:org,read:user,user:email"
     
     # GitLab Integration
     gitlab_client_id: Optional[str] = None

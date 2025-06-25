@@ -70,6 +70,72 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
     
+    async def get_user_repositories(self, username: str, per_page: int = 100) -> List[Dict]:
+        """Get all public repositories for a GitHub user"""
+        url = f"{self.base_url}/users/{username}/repos"
+        params = {"per_page": per_page, "sort": "updated", "direction": "desc"}
+        
+        repos = []
+        page = 1
+        
+        async with httpx.AsyncClient() as client:
+            while True:
+                params["page"] = page
+                response = await client.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+                
+                page_repos = response.json()
+                if not page_repos:
+                    break
+                    
+                repos.extend(page_repos)
+                page += 1
+                
+                # Limit to prevent rate limiting
+                if len(repos) >= 1000:
+                    break
+        
+        return repos
+    
+    async def get_organization_repositories(self, org: str, per_page: int = 100) -> List[Dict]:
+        """Get all repositories for a GitHub organization"""
+        url = f"{self.base_url}/orgs/{org}/repos"
+        params = {"per_page": per_page, "sort": "updated", "direction": "desc"}
+        
+        repos = []
+        page = 1
+        
+        async with httpx.AsyncClient() as client:
+            while True:
+                params["page"] = page
+                response = await client.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+                
+                page_repos = response.json()
+                if not page_repos:
+                    break
+                    
+                repos.extend(page_repos)
+                page += 1
+                
+                # Limit to prevent rate limiting
+                if len(repos) >= 1000:
+                    break
+        
+        return repos
+    
+    async def get_user_organizations(self, username: str = None) -> List[Dict]:
+        """Get organizations for a user (or authenticated user if no username provided)"""
+        if username:
+            url = f"{self.base_url}/users/{username}/orgs"
+        else:
+            url = f"{self.base_url}/user/orgs"
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=self.headers)
+            response.raise_for_status()
+            return response.json()
+
     def parse_repository_url(self, repo_url: str) -> tuple[str, str]:
         """Parse GitHub repository URL to extract owner and repo name"""
         # Handle various GitHub URL formats

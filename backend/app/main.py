@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.database import engine, Base
-from app.api import auth, repositories, analytics
+from app.api import auth, repositories, analytics, github, tasks
 from app.config import settings
 
 @asynccontextmanager
@@ -33,6 +33,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(repositories.router, prefix="/api/repositories", tags=["repositories"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(github.router, prefix="/api/github", tags=["github"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 
 @app.get("/")
 async def root():

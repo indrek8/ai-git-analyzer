@@ -15,7 +15,9 @@
                 <div class="nav-menu" id="nav-menu">
                     <a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a>
                     <a href="#repositories" class="nav-link" data-page="repositories">Repositories</a>
+                    <a href="#github" class="nav-link" data-page="github">GitHub Users</a>
                     <a href="#analytics" class="nav-link" data-page="analytics">Analytics</a>
+                    <a href="#tasks" class="nav-link" data-page="tasks">Tasks</a>
                     <a href="#settings" class="nav-link" data-page="settings">Settings</a>
                     <span class="nav-user" id="nav-user">Welcome!</span>
                     <a href="#logout" class="nav-link" id="logout-btn">Logout</a>
@@ -110,6 +112,106 @@
             </div>
         </div>
 
+        <!-- GitHub Users Page -->
+        <div id="github-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>GitHub Users & Organizations</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="add-github-user-btn">Add GitHub User</button>
+                        <button class="btn btn-success" id="connect-github-org-btn">Connect Organization</button>
+                    </div>
+                </div>
+                
+                <!-- Add GitHub User Form -->
+                <div id="add-github-user-form" class="form-container" style="display: none;">
+                    <h3>Add GitHub User for Monitoring</h3>
+                    <form id="github-user-form">
+                        <div class="form-group">
+                            <label for="github-username">GitHub Username</label>
+                            <input type="text" id="github-username" name="github-username" placeholder="octocat" required>
+                            <small>Enter the GitHub username to monitor their public repositories</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Add User</button>
+                            <button type="button" class="btn btn-secondary" id="cancel-add-github-user">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Section Tabs -->
+                <div class="section-tabs">
+                    <button class="tab-btn active" id="users-tab" onclick="app.switchTab('users')">Users</button>
+                    <button class="tab-btn" id="organizations-tab" onclick="app.switchTab('organizations')">Organizations</button>
+                </div>
+
+                <!-- GitHub Users List -->
+                <div class="tab-content" id="users-content">
+                    <div class="github-users-list" id="github-users-list">
+                        <!-- GitHub users will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- GitHub Organizations List -->
+                <div class="tab-content" id="organizations-content" style="display: none;">
+                    <div class="github-organizations-list" id="github-organizations-list">
+                        <!-- GitHub organizations will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OAuth Connection Modal -->
+        <div id="oauth-modal" class="oauth-modal" style="display: none;">
+            <div class="oauth-modal-content">
+                <h3>Connect GitHub Organization</h3>
+                <p>To monitor repositories from a GitHub organization, you need to authorize access through GitHub OAuth.</p>
+                
+                <div class="oauth-steps">
+                    <ol>
+                        <li>Click "Authorize GitHub" below</li>
+                        <li>Sign in to GitHub if prompted</li>
+                        <li>Select which organizations to grant access to</li>
+                        <li>Click "Authorize" to complete the connection</li>
+                    </ol>
+                </div>
+
+                <div class="oauth-actions">
+                    <button class="btn btn-success" id="start-oauth-btn">Authorize GitHub</button>
+                    <button class="btn btn-secondary" id="cancel-oauth-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repository Selection Modal -->
+        <div id="repo-selection-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">Select Repositories</h3>
+                    <span class="close" id="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="repo-selection-controls">
+                        <div class="search-filter">
+                            <input type="text" id="repo-search" placeholder="Search repositories...">
+                            <select id="language-filter">
+                                <option value="">All Languages</option>
+                            </select>
+                        </div>
+                        <div class="bulk-actions">
+                            <button class="btn btn-sm" id="select-all-repos">Select All</button>
+                            <button class="btn btn-sm" id="deselect-all-repos">Deselect All</button>
+                            <button class="btn btn-primary" id="sync-selected-repos">Sync Selected</button>
+                        </div>
+                    </div>
+                    
+                    <div class="repositories-grid" id="repositories-grid">
+                        <!-- Repository selection items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Analytics Page -->
         <div id="analytics-page" class="page">
             <div class="container">
@@ -120,6 +222,69 @@
                         <div id="effort-chart" class="chart-placeholder">
                             Chart will be displayed here
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Page -->
+        <div id="tasks-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>Background Tasks</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="refresh-tasks-btn">Refresh</button>
+                        <button class="btn btn-success" id="bulk-sync-btn">Bulk Sync Repositories</button>
+                    </div>
+                </div>
+
+                <!-- Task Statistics -->
+                <div class="task-stats">
+                    <div class="stat-card">
+                        <h3>Repository Sync</h3>
+                        <div class="sync-stats" id="sync-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Completed:</span>
+                                <span class="stat-value" id="completed-repos">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Failed:</span>
+                                <span class="stat-value" id="failed-repos">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Pending:</span>
+                                <span class="stat-value" id="pending-repos">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>GitHub Sources</h3>
+                        <div class="github-stats" id="github-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Users:</span>
+                                <span class="stat-value" id="github-users-count">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Organizations:</span>
+                                <span class="stat-value" id="github-orgs-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Tasks -->
+                <div class="active-tasks">
+                    <h3>Active Tasks</h3>
+                    <div class="tasks-list" id="active-tasks-list">
+                        <!-- Active tasks will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Task History -->
+                <div class="task-history">
+                    <h3>Recent Task History</h3>
+                    <div class="tasks-list" id="task-history-list">
+                        <!-- Task history will be loaded here -->
                     </div>
                 </div>
             </div>

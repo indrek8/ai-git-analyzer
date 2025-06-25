@@ -42,3 +42,4 @@ class Repository(Base):
     # Relationships
     owner = relationship("User", back_populates="repositories")
     commits = relationship("Commit", back_populates="repository")
+    selection = relationship("RepositorySelection", back_populates="repository", uselist=False)

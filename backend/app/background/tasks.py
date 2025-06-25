@@ -227,3 +227,370 @@ def analyze_commits(self, repository_id: int):
         raise self.retry(exc=exc, countdown=60, max_retries=3)
     finally:
         db.close()
+
+@celery_app.task(bind=True)
+def bulk_sync_repositories(self, repository_ids: list, user_id: int):
+    """
+    Background task to sync multiple repositories in parallel with progress tracking
+    """
+    db = SessionLocal()
+    try:
+        from app.models.repository import Repository
+        from app.models.user import User
+        
+        self.update_state(state='PROGRESS', meta={
+            'progress': 0, 
+            'status': 'Starting bulk sync',
+            'total_repos': len(repository_ids),
+            'completed_repos': 0,
+            'failed_repos': 0
+        })
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise Exception(f"User {user_id} not found")
+        
+        # Validate repositories belong to user
+        repositories = db.query(Repository).filter(
+            Repository.id.in_(repository_ids),
+            Repository.owner_id == user_id
+        ).all()
+        
+        if len(repositories) != len(repository_ids):
+            raise Exception("Some repositories not found or not owned by user")
+        
+        total_repos = len(repositories)
+        completed = 0
+        failed = 0
+        results = []
+        
+        # Process repositories in chunks to avoid overwhelming the system
+        chunk_size = 5
+        for i in range(0, total_repos, chunk_size):
+            chunk = repositories[i:i + chunk_size]
+            
+            # Start sync tasks for this chunk
+            chunk_tasks = []
+            for repo in chunk:
+                task = sync_repository.delay(repo.id)
+                chunk_tasks.append((repo, task))
+            
+            # Wait for chunk to complete
+            for repo, task in chunk_tasks:
+                try:
+                    result = task.get(timeout=300)  # 5 minute timeout per repo
+                    results.append({"repository_id": repo.id, "status": "completed", "name": repo.name})
+                    completed += 1
+                except Exception as e:
+                    results.append({"repository_id": repo.id, "status": "failed", "name": repo.name, "error": str(e)})
+                    failed += 1
+                
+                # Update progress
+                progress = int(((completed + failed) / total_repos) * 100)
+                self.update_state(state='PROGRESS', meta={
+                    'progress': progress,
+                    'status': f'Synced {completed + failed}/{total_repos} repositories',
+                    'total_repos': total_repos,
+                    'completed_repos': completed,
+                    'failed_repos': failed,
+                    'results': results
+                })
+        
+        logger.info(f"Bulk sync completed: {completed} successful, {failed} failed")
+        return {
+            "status": "completed",
+            "total_repos": total_repos,
+            "completed_repos": completed,
+            "failed_repos": failed,
+            "results": results
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed bulk sync for user {user_id}: {str(exc)}")
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def refresh_github_user_repositories(self, github_user_id: int):
+    """
+    Background task to refresh repository list for a GitHub user
+    """
+    db = SessionLocal()
+    try:
+        from app.models.github_user import GitHubUser
+        from app.models.repository_selection import RepositorySelection, SelectionStatus
+        from app.repositories.github import GitHubClient
+        
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'status': 'Starting refresh'})
+        
+        github_user = db.query(GitHubUser).filter(GitHubUser.id == github_user_id).first()
+        if not github_user:
+            raise Exception(f"GitHub user {github_user_id} not found")
+        
+        # Get access token from user
+        user = github_user.added_by
+        github_client = GitHubClient(user.github_token)
+        
+        self.update_state(state='PROGRESS', meta={'progress': 20, 'status': 'Fetching repositories from GitHub'})
+        
+        # Fetch latest repositories
+        import asyncio
+        repos = await asyncio.run(github_client.get_user_repositories(github_user.username))
+        
+        self.update_state(state='PROGRESS', meta={'progress': 50, 'status': f'Processing {len(repos)} repositories'})
+        
+        new_repos = 0
+        updated_repos = 0
+        
+        for repo_data in repos:
+            existing_selection = db.query(RepositorySelection).filter(
+                RepositorySelection.github_repo_id == repo_data["id"],
+                RepositorySelection.github_user_id == github_user_id
+            ).first()
+            
+            if not existing_selection:
+                # New repository
+                selection = RepositorySelection(
+                    github_repo_id=repo_data["id"],
+                    name=repo_data["name"],
+                    full_name=repo_data["full_name"],
+                    description=repo_data.get("description"),
+                    url=repo_data["html_url"],
+                    clone_url=repo_data["clone_url"],
+                    default_branch=repo_data.get("default_branch", "main"),
+                    is_private=repo_data.get("private", False),
+                    is_fork=repo_data.get("fork", False),
+                    is_archived=repo_data.get("archived", False),
+                    stargazers_count=repo_data.get("stargazers_count", 0),
+                    watchers_count=repo_data.get("watchers_count", 0),
+                    forks_count=repo_data.get("forks_count", 0),
+                    size=repo_data.get("size", 0),
+                    language=repo_data.get("language"),
+                    github_user_id=github_user_id,
+                    selected_by_user_id=github_user.added_by_user_id,
+                    status=SelectionStatus.PENDING
+                )
+                db.add(selection)
+                new_repos += 1
+            else:
+                # Update existing repository metadata
+                existing_selection.description = repo_data.get("description")
+                existing_selection.stargazers_count = repo_data.get("stargazers_count", 0)
+                existing_selection.watchers_count = repo_data.get("watchers_count", 0)
+                existing_selection.forks_count = repo_data.get("forks_count", 0)
+                existing_selection.size = repo_data.get("size", 0)
+                existing_selection.language = repo_data.get("language")
+                existing_selection.is_archived = repo_data.get("archived", False)
+                updated_repos += 1
+        
+        # Update user stats
+        github_user.public_repos = len(repos)
+        github_user.last_synced_at = datetime.utcnow()
+        
+        db.commit()
+        
+        self.update_state(state='PROGRESS', meta={'progress': 100, 'status': 'Refresh completed'})
+        
+        logger.info(f"Refreshed repositories for GitHub user {github_user.username}: {new_repos} new, {updated_repos} updated")
+        return {
+            "status": "completed", 
+            "github_user_id": github_user_id,
+            "username": github_user.username,
+            "new_repositories": new_repos,
+            "updated_repositories": updated_repos,
+            "total_repositories": len(repos)
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed to refresh GitHub user {github_user_id}: {str(exc)}")
+        raise self.retry(exc=exc, countdown=60, max_retries=3)
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def refresh_github_organization_repositories(self, github_org_id: int):
+    """
+    Background task to refresh repository list for a GitHub organization
+    """
+    db = SessionLocal()
+    try:
+        from app.models.github_organization import GitHubOrganization
+        from app.models.repository_selection import RepositorySelection, SelectionStatus
+        from app.repositories.github import GitHubClient
+        
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'status': 'Starting refresh'})
+        
+        github_org = db.query(GitHubOrganization).filter(GitHubOrganization.id == github_org_id).first()
+        if not github_org:
+            raise Exception(f"GitHub organization {github_org_id} not found")
+        
+        if not github_org.access_token:
+            raise Exception("No OAuth token available for this organization")
+        
+        github_client = GitHubClient(github_org.access_token)
+        
+        self.update_state(state='PROGRESS', meta={'progress': 20, 'status': 'Fetching repositories from GitHub'})
+        
+        # Fetch latest repositories
+        import asyncio
+        repos = await asyncio.run(github_client.get_organization_repositories(github_org.login))
+        
+        self.update_state(state='PROGRESS', meta={'progress': 50, 'status': f'Processing {len(repos)} repositories'})
+        
+        new_repos = 0
+        updated_repos = 0
+        
+        for repo_data in repos:
+            existing_selection = db.query(RepositorySelection).filter(
+                RepositorySelection.github_repo_id == repo_data["id"],
+                RepositorySelection.github_organization_id == github_org_id
+            ).first()
+            
+            if not existing_selection:
+                # New repository
+                selection = RepositorySelection(
+                    github_repo_id=repo_data["id"],
+                    name=repo_data["name"],
+                    full_name=repo_data["full_name"],
+                    description=repo_data.get("description"),
+                    url=repo_data["html_url"],
+                    clone_url=repo_data["clone_url"],
+                    default_branch=repo_data.get("default_branch", "main"),
+                    is_private=repo_data.get("private", False),
+                    is_fork=repo_data.get("fork", False),
+                    is_archived=repo_data.get("archived", False),
+                    stargazers_count=repo_data.get("stargazers_count", 0),
+                    watchers_count=repo_data.get("watchers_count", 0),
+                    forks_count=repo_data.get("forks_count", 0),
+                    size=repo_data.get("size", 0),
+                    language=repo_data.get("language"),
+                    github_organization_id=github_org_id,
+                    selected_by_user_id=github_org.added_by_user_id,
+                    status=SelectionStatus.PENDING
+                )
+                db.add(selection)
+                new_repos += 1
+            else:
+                # Update existing repository metadata
+                existing_selection.description = repo_data.get("description")
+                existing_selection.stargazers_count = repo_data.get("stargazers_count", 0)
+                existing_selection.watchers_count = repo_data.get("watchers_count", 0)
+                existing_selection.forks_count = repo_data.get("forks_count", 0)
+                existing_selection.size = repo_data.get("size", 0)
+                existing_selection.language = repo_data.get("language")
+                existing_selection.is_archived = repo_data.get("archived", False)
+                updated_repos += 1
+        
+        # Update organization stats
+        github_org.public_repos = len(repos)
+        github_org.last_synced_at = datetime.utcnow()
+        
+        db.commit()
+        
+        self.update_state(state='PROGRESS', meta={'progress': 100, 'status': 'Refresh completed'})
+        
+        logger.info(f"Refreshed repositories for GitHub organization {github_org.login}: {new_repos} new, {updated_repos} updated")
+        return {
+            "status": "completed", 
+            "github_org_id": github_org_id,
+            "login": github_org.login,
+            "new_repositories": new_repos,
+            "updated_repositories": updated_repos,
+            "total_repositories": len(repos)
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed to refresh GitHub organization {github_org_id}: {str(exc)}")
+        raise self.retry(exc=exc, countdown=60, max_retries=3)
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def periodic_refresh_all_github_sources(self):
+    """
+    Periodic task to refresh all GitHub users and organizations
+    """
+    db = SessionLocal()
+    try:
+        from app.models.github_user import GitHubUser
+        from app.models.github_organization import GitHubOrganization
+        
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'status': 'Starting periodic refresh'})
+        
+        # Get all active GitHub users and organizations
+        github_users = db.query(GitHubUser).filter(GitHubUser.is_active == True).all()
+        github_orgs = db.query(GitHubOrganization).filter(GitHubOrganization.is_active == True).all()
+        
+        total_sources = len(github_users) + len(github_orgs)
+        processed = 0
+        
+        logger.info(f"Starting periodic refresh of {len(github_users)} users and {len(github_orgs)} organizations")
+        
+        # Refresh GitHub users
+        for user in github_users:
+            try:
+                task = refresh_github_user_repositories.delay(user.id)
+                task.get(timeout=180)  # 3 minute timeout
+                processed += 1
+                
+                progress = int((processed / total_sources) * 100)
+                self.update_state(state='PROGRESS', meta={
+                    'progress': progress,
+                    'status': f'Refreshed {processed}/{total_sources} sources'
+                })
+                
+            except Exception as e:
+                logger.error(f"Failed to refresh GitHub user {user.username}: {str(e)}")
+                processed += 1
+        
+        # Refresh GitHub organizations
+        for org in github_orgs:
+            try:
+                task = refresh_github_organization_repositories.delay(org.id)
+                task.get(timeout=180)  # 3 minute timeout
+                processed += 1
+                
+                progress = int((processed / total_sources) * 100)
+                self.update_state(state='PROGRESS', meta={
+                    'progress': progress,
+                    'status': f'Refreshed {processed}/{total_sources} sources'
+                })
+                
+            except Exception as e:
+                logger.error(f"Failed to refresh GitHub organization {org.login}: {str(e)}")
+                processed += 1
+        
+        logger.info(f"Periodic refresh completed: {processed}/{total_sources} sources processed")
+        return {
+            "status": "completed",
+            "total_sources": total_sources,
+            "processed_sources": processed,
+            "github_users": len(github_users),
+            "github_orgs": len(github_orgs)
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed periodic refresh: {str(exc)}")
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def cleanup_old_tasks(self):
+    """
+    Cleanup old completed tasks to prevent database bloat
+    """
+    try:
+        from celery.result import AsyncResult
+        from datetime import timedelta
+        
+        # This would require additional setup to track task results in database
+        # For now, just a placeholder that logs the cleanup attempt
+        logger.info("Cleaning up old tasks (placeholder implementation)")
+        
+        return {"status": "completed", "cleaned_tasks": 0}
+        
+    except Exception as exc:
+        logger.error(f"Failed to cleanup old tasks: {str(exc)}")
+        raise

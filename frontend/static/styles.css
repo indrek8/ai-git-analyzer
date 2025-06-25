@@ -33,6 +33,634 @@ body {
     padding: 0 1rem;
 }
 
+/* GitHub Users & Organizations Styles */
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.section-tabs {
+    margin: 2rem 0 1rem 0;
+    border-bottom: 2px solid #ecf0f1;
+    display: flex;
+    gap: 0;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 1rem 2rem;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+    color: #2c3e50;
+    border-bottom-color: #3498db;
+    background: #f8f9fa;
+}
+
+.tab-btn:hover {
+    background: #f8f9fa;
+    color: #2c3e50;
+}
+
+.tab-content {
+    margin-top: 1rem;
+}
+
+.github-users-list, .github-organizations-list {
+    margin-top: 1rem;
+}
+
+.github-user-item {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.github-user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.github-user-info {
+    flex: 1;
+}
+
+.github-user-info h3 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.github-user-info p {
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.github-user-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.stat-badge {
+    background: #ecf0f1;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: #2c3e50;
+}
+
+.github-user-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+/* GitHub Organization Styles */
+.github-organization-item {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-left: 4px solid #9b59b6;
+}
+
+.github-organization-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.github-organization-info {
+    flex: 1;
+}
+
+.github-organization-info h3 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.github-organization-info p {
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.oauth-status {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+}
+
+.oauth-status.connected {
+    background: #d5f4e6;
+    color: #27ae60;
+}
+
+.oauth-status.expired {
+    background: #fadbd8;
+    color: #e74c3c;
+}
+
+.github-organization-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+/* OAuth Connection Modal */
+.oauth-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.oauth-modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.oauth-modal h3 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.oauth-modal p {
+    margin-bottom: 1.5rem;
+    color: #666;
+    line-height: 1.5;
+}
+
+.oauth-steps {
+    text-align: left;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.oauth-steps ol {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.oauth-steps li {
+    margin-bottom: 0.5rem;
+    color: #555;
+}
+
+/* Task Management Styles */
+.task-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #3498db;
+}
+
+.stat-card h3 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.sync-stats, .github-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.active-tasks, .task-history {
+    margin-bottom: 2rem;
+}
+
+.active-tasks h3, .task-history h3 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 0.5rem;
+}
+
+.tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.task-item {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #3498db;
+}
+
+.task-item.running {
+    border-left-color: #f39c12;
+    background: #fef9e7;
+}
+
+.task-item.completed {
+    border-left-color: #27ae60;
+}
+
+.task-item.failed {
+    border-left-color: #e74c3c;
+    background: #fdedec;
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.task-title {
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.task-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.task-status.pending {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.task-status.running {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.task-status.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.task-status.failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.task-progress {
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #ecf0f1;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #3498db;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-fill.completed {
+    background: #27ae60;
+}
+
+.progress-fill.failed {
+    background: #e74c3c;
+}
+
+.progress-text {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.task-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    font-size: 0.875rem;
+}
+
+.task-detail {
+    display: flex;
+    flex-direction: column;
+}
+
+.task-detail-label {
+    color: #666;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.task-detail-value {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.task-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.task-actions .btn {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+.empty-tasks {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+/* Progress Animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.task-item.running .progress-fill {
+    animation: pulse 2s infinite;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #ecf0f1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.close:hover {
+    background: #ecf0f1;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Repository Selection Controls */
+.repo-selection-controls {
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.search-filter {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+}
+
+.search-filter input,
+.search-filter select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-filter input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.bulk-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Repository Grid */
+.repositories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.repo-selection-item {
+    background: #f8f9fa;
+    border: 2px solid #ecf0f1;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.repo-selection-item:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.repo-selection-item.selected {
+    border-color: #27ae60;
+    background: #d5f4e6;
+}
+
+.repo-selection-item.deselected {
+    border-color: #e74c3c;
+    background: #fadbd8;
+}
+
+.repo-checkbox {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.repo-info h4 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.repo-info p {
+    color: #666;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.repo-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.repo-meta span {
+    background: #ecf0f1;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.repo-meta .language {
+    background: #3498db;
+    color: white;
+}
+
+.repo-meta .stars {
+    background: #f39c12;
+    color: white;
+}
+
+.repo-meta .forks {
+    background: #9b59b6;
+    color: white;
+}
+
+/* Status indicators */
+.status-indicator {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-pending {
+    background: #f39c12;
+}
+
+.status-selected {
+    background: #27ae60;
+}
+
+.status-deselected {
+    background: #e74c3c;
+}
+
+.status-synced {
+    background: #3498db;
+}
+
 .nav-title {
     font-size: 1.5rem;
     font-weight: 600;
