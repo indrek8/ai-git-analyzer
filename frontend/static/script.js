@@ -52,13 +52,28 @@ class GitAnalyticsApp {
         }
     }
 
-    checkAuth() {
+    async checkAuth() {
         if (this.token) {
-            this.showPage('dashboard');
-            this.loadDashboardData();
-        } else {
-            this.showPage('login');
+            // Verify token is still valid
+            try {
+                const userInfo = await this.apiCall('/auth/me');
+                if (userInfo) {
+                    localStorage.setItem('user', JSON.stringify(userInfo));
+                    this.updateUserDisplay(userInfo);
+                    this.showPage('dashboard');
+                    this.loadDashboardData();
+                    return;
+                }
+            } catch (error) {
+                console.log('Token invalid, redirecting to login');
+            }
         }
+        
+        // Token invalid or missing
+        this.token = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        this.showPage('login');
     }
 
     async handleLogin(e) {
@@ -76,15 +91,26 @@ class GitAnalyticsApp {
                 body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
             });
 
+            const data = await response.json();
+
             if (response.ok) {
-                const data = await response.json();
                 this.token = data.access_token;
                 localStorage.setItem('token', this.token);
-                this.showPage('dashboard');
-                this.loadDashboardData();
-                document.getElementById('login-error').textContent = '';
+                
+                // Load user info
+                const userInfo = await this.apiCall('/auth/me');
+                if (userInfo) {
+                    localStorage.setItem('user', JSON.stringify(userInfo));
+                    this.updateUserDisplay(userInfo);
+                    this.showPage('dashboard');
+                    this.loadDashboardData();
+                    document.getElementById('login-error').textContent = '';
+                } else {
+                    document.getElementById('login-error').textContent = 'Failed to load user information';
+                }
             } else {
-                document.getElementById('login-error').textContent = 'Invalid credentials';
+                console.error('Login failed:', data);
+                document.getElementById('login-error').textContent = data.detail || 'Invalid credentials';
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -95,6 +121,7 @@ class GitAnalyticsApp {
     handleLogout() {
         this.token = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         this.showPage('login');
     }
 
@@ -157,14 +184,24 @@ class GitAnalyticsApp {
             ...options
         };
 
-        const response = await fetch(`${this.apiBase}${endpoint}`, config);
-        
-        if (response.status === 401) {
-            this.handleLogout();
+        try {
+            const response = await fetch(`${this.apiBase}${endpoint}`, config);
+            
+            if (response.status === 401) {
+                this.handleLogout();
+                return null;
+            }
+
+            if (!response.ok) {
+                console.error(`API call failed: ${response.status} ${response.statusText}`);
+                return null;
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API call error:', error);
             return null;
         }
-
-        return response.json();
     }
 
     async loadDashboardData() {
@@ -193,7 +230,7 @@ class GitAnalyticsApp {
         if (!container) return;
 
         if (repositories.length === 0) {
-            container.innerHTML = '<p>No repositories added yet. Click "Add Repository" to get started.</p>';
+            container.innerHTML = '<div class="repository-item"><p>No repositories added yet. Click "Add Repository" to get started.</p></div>';
             return;
         }
 
@@ -201,11 +238,16 @@ class GitAnalyticsApp {
             <div class="repository-item">
                 <div class="repository-info">
                     <h3>${repo.name}</h3>
-                    <p>${repo.url}</p>
-                    <p>Provider: ${repo.provider} | Status: ${repo.sync_status}</p>
+                    <p><strong>URL:</strong> ${repo.url}</p>
+                    <p><strong>Provider:</strong> ${repo.provider} | <strong>Status:</strong> 
+                        <span class="status-${repo.sync_status}">${repo.sync_status}</span>
+                    </p>
                 </div>
                 <div class="repository-actions">
-                    <button class="btn btn-primary" onclick="app.syncRepository(${repo.id})">Sync</button>
+                    <button class="btn btn-primary" onclick="app.syncRepository(${repo.id})" 
+                        ${repo.sync_status === 'syncing' ? 'disabled' : ''}>
+                        ${repo.sync_status === 'syncing' ? 'Syncing...' : 'Sync'}
+                    </button>
                     <button class="btn btn-secondary" onclick="app.removeRepository(${repo.id})">Remove</button>
                 </div>
             </div>
@@ -239,9 +281,11 @@ class GitAnalyticsApp {
             if (result) {
                 this.hideAddRepoForm();
                 this.loadRepositories();
+                alert('Repository added successfully! Sync started in background.');
             }
         } catch (error) {
             console.error('Failed to add repository:', error);
+            alert('Failed to add repository. Please check the URL and try again.');
         }
     }
 
@@ -276,6 +320,13 @@ class GitAnalyticsApp {
             console.log('Analytics data:', analytics);
         } catch (error) {
             console.error('Failed to load analytics:', error);
+        }
+    }
+
+    updateUserDisplay(userInfo) {
+        const navUser = document.getElementById('nav-user');
+        if (navUser && userInfo) {
+            navUser.textContent = `Welcome, ${userInfo.full_name || userInfo.username}!`;
         }
     }
 

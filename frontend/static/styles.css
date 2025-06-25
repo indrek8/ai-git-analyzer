@@ -56,6 +56,12 @@ body {
     background-color: #34495e;
 }
 
+.nav-user {
+    color: #bdc3c7;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
 .nav-toggle {
     display: none;
     flex-direction: column;
@@ -277,6 +283,27 @@ body {
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Status indicators */
+.status-pending {
+    color: #f39c12;
+    font-weight: bold;
+}
+
+.status-syncing {
+    color: #3498db;
+    font-weight: bold;
+}
+
+.status-completed {
+    color: #27ae60;
+    font-weight: bold;
+}
+
+.status-failed {
+    color: #e74c3c;
+    font-weight: bold;
 }
 
 /* Responsive design */
