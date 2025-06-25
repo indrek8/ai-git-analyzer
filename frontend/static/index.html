@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Engineering Analytics Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-title">Git Analytics</h1>
+                <div class="nav-menu" id="nav-menu">
+                    <a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a>
+                    <a href="#repositories" class="nav-link" data-page="repositories">Repositories</a>
+                    <a href="#analytics" class="nav-link" data-page="analytics">Analytics</a>
+                    <a href="#settings" class="nav-link" data-page="settings">Settings</a>
+                    <a href="#logout" class="nav-link" id="logout-btn">Logout</a>
+                </div>
+                <div class="nav-toggle" id="nav-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Login Form -->
+        <div id="login-page" class="page active">
+            <div class="login-container">
+                <h2>Login to Git Analytics</h2>
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <div id="login-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page">
+            <div class="container">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Repositories</h3>
+                        <p class="stat-number" id="total-repos">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Commits</h3>
+                        <p class="stat-number" id="total-commits">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Developers</h3>
+                        <p class="stat-number" id="active-developers">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Effort Score</h3>
+                        <p class="stat-number" id="effort-score">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repositories Page -->
+        <div id="repositories-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>Repositories</h2>
+                    <button class="btn btn-primary" id="add-repo-btn">Add Repository</button>
+                </div>
+                
+                <!-- Add Repository Form -->
+                <div id="add-repo-form" class="form-container" style="display: none;">
+                    <h3>Add New Repository</h3>
+                    <form id="repository-form">
+                        <div class="form-group">
+                            <label for="repo-url">Repository URL</label>
+                            <input type="url" id="repo-url" name="repo-url" placeholder="https://github.com/user/repo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="provider">Provider</label>
+                            <select id="provider" name="provider">
+                                <option value="github">GitHub</option>
+                                <option value="gitlab">GitLab</option>
+                                <option value="bitbucket">Bitbucket</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Add Repository</button>
+                            <button type="button" class="btn btn-secondary" id="cancel-add-repo">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Repository List -->
+                <div class="repository-list" id="repository-list">
+                    <!-- Repositories will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Page -->
+        <div id="analytics-page" class="page">
+            <div class="container">
+                <h2>Analytics</h2>
+                <div class="analytics-content">
+                    <div class="chart-container">
+                        <h3>Effort Analysis</h3>
+                        <div id="effort-chart" class="chart-placeholder">
+                            Chart will be displayed here
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settings-page" class="page">
+            <div class="container">
+                <h2>Settings</h2>
+                <div class="settings-content">
+                    <h3>API Configuration</h3>
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label for="github-token">GitHub Personal Access Token</label>
+                            <input type="password" id="github-token" name="github-token" placeholder="ghp_...">
+                        </div>
+                        <div class="form-group">
+                            <label for="openai-key">OpenAI API Key</label>
+                            <input type="password" id="openai-key" name="openai-key" placeholder="sk-...">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
