@@ -79,10 +79,11 @@ def sync_repository(self, repository_id: int):
         db.close()
 
 async def _sync_github_repository(repository, db, task_instance):
-    """Sync GitHub repository data"""
+    """Sync GitHub repository data with rate limiting"""
     from app.models.commit import Commit
     from app.models.developer import Developer
     from app.repositories.github import GitHubClient, parse_commit_data
+    import asyncio
     
     github_client = GitHubClient()
     
@@ -92,7 +93,8 @@ async def _sync_github_repository(repository, db, task_instance):
         
         task_instance.update_state(state='PROGRESS', meta={'progress': 20, 'status': 'Fetching repository info'})
         
-        # Get repository info
+        # Get repository info with rate limiting delay
+        await asyncio.sleep(1)  # 1 second delay before API calls
         repo_info = await github_client.get_repository_info(owner, repo_name)
         
         # Update repository metadata
@@ -102,7 +104,8 @@ async def _sync_github_repository(repository, db, task_instance):
         
         task_instance.update_state(state='PROGRESS', meta={'progress': 30, 'status': 'Fetching commits'})
         
-        # Get commits since last sync
+        # Get commits since last sync with rate limiting delay
+        await asyncio.sleep(1)  # Additional delay before commits API call
         since_date = repository.last_synced_at
         commits_data = await github_client.get_commits(owner, repo_name, since=since_date)
         
@@ -276,8 +279,8 @@ def bulk_sync_repositories(self, repository_ids: list, user_id: int):
         failed = 0
         results = []
         
-        # Process repositories in chunks to avoid overwhelming the system
-        chunk_size = 5
+        # Process repositories in chunks with rate limiting to avoid API limits
+        chunk_size = 3  # Reduced chunk size for rate limiting
         for i in range(0, total_repos, chunk_size):
             chunk = repositories[i:i + chunk_size]
             
@@ -287,8 +290,13 @@ def bulk_sync_repositories(self, repository_ids: list, user_id: int):
                 task = sync_repository.delay(repo.id)
                 chunk_tasks.append((repo, task))
             
-            # Wait for chunk to complete
-            for repo, task in chunk_tasks:
+            # Wait for chunk to complete with staggered delays
+            import time
+            for j, (repo, task) in enumerate(chunk_tasks):
+                # Add delay between requests to avoid rate limiting
+                if j > 0:
+                    time.sleep(2)  # 2 second delay between repos in chunk
+                
                 try:
                     result = task.get(timeout=300)  # 5 minute timeout per repo
                     results.append({"repository_id": repo.id, "status": "completed", "name": repo.name})

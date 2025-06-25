@@ -917,3 +917,88 @@ async def get_task_status(
     except Exception as e:
         logger.error(f"Failed to get task status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get task status")
+
+@router.post("/repositories/reset-failed")
+async def reset_failed_repositories(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset failed repositories to pending status for retry"""
+    try:
+        from app.models.repository import Repository
+        
+        # Reset failed repositories to pending
+        updated_count = db.query(Repository).filter(
+            Repository.owner_id == current_user.id,
+            Repository.sync_status == "failed"
+        ).update(
+            {
+                Repository.sync_status: "pending",
+                Repository.sync_error: None,
+                Repository.last_synced_at: None
+            },
+            synchronize_session=False
+        )
+        
+        db.commit()
+        
+        return {
+            "message": f"Reset {updated_count} failed repositories to pending status",
+            "reset_count": updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to reset repositories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reset repositories")
+
+@router.post("/repositories/retry-sync")
+async def retry_failed_repositories(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset failed repositories and trigger retry sync with rate limiting"""
+    try:
+        from app.models.repository import Repository
+        from app.background.tasks import sync_repository
+        
+        # Get failed repositories
+        failed_repos = db.query(Repository).filter(
+            Repository.owner_id == current_user.id,
+            Repository.sync_status == "failed"
+        ).all()
+        
+        if not failed_repos:
+            return {"message": "No failed repositories to retry", "retry_count": 0}
+        
+        # Reset status
+        for repo in failed_repos:
+            repo.sync_status = "pending"
+            repo.sync_error = None
+            repo.last_synced_at = None
+        
+        db.commit()
+        
+        # Trigger retry with delays (process in smaller batches)
+        import time
+        retry_count = len(failed_repos)
+        
+        for i, repo in enumerate(failed_repos):
+            try:
+                # Add delay between sync requests to avoid rate limiting
+                if i > 0 and i % 3 == 0:  # Delay every 3 repos
+                    time.sleep(5)  # 5 second delay
+                
+                sync_repository.delay(repo.id)
+                logger.info(f"Queued retry sync for repository {repo.name}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to queue retry for repository {repo.name}: {str(e)}")
+        
+        return {
+            "message": f"Queued {retry_count} repositories for retry sync with rate limiting",
+            "retry_count": retry_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retry repositories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retry repositories")
