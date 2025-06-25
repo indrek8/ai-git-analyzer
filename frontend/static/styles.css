@@ -578,6 +578,11 @@ body {
     background: #d5f4e6;
 }
 
+.repo-selection-item.synced {
+    border-color: #27ae60;
+    background: #d5f4e6;
+}
+
 .repo-selection-item.deselected {
     border-color: #e74c3c;
     background: #fadbd8;
@@ -658,7 +663,7 @@ body {
 }
 
 .status-synced {
-    background: #3498db;
+    background: #27ae60;
 }
 
 .nav-title {

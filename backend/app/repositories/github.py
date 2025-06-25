@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class GitHubClient:
     def __init__(self, access_token: Optional[str] = None):
-        self.access_token = access_token or settings.github_client_secret
+        self.access_token = access_token
         self.base_url = "https://api.github.com"
         self.headers = {
             "Accept": "application/vnd.github.v3+json",

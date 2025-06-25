@@ -561,7 +561,7 @@ class GitAnalyticsApp {
             <div class="repo-selection-item ${repo.status}" data-repo-id="${repo.id}">
                 <div class="status-indicator status-${repo.status}"></div>
                 <input type="checkbox" class="repo-checkbox" 
-                       ${repo.status === 'selected' ? 'checked' : ''} 
+                       ${repo.status === 'selected' || repo.status === 'synced' ? 'checked' : ''} 
                        onchange="app.toggleRepositorySelection(${repo.id}, this.checked)">
                 <div class="repo-info">
                     <h4>${repo.name}</h4>

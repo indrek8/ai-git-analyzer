@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 import httpx
 import secrets
+import logging
 from urllib.parse import urlencode
 
 from app.database import get_db
@@ -17,6 +18,7 @@ from app.config import settings
 from app.repositories.github import GitHubClient
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Pydantic models for request/response
 class GitHubUserResponse(BaseModel):
@@ -172,11 +174,29 @@ async def add_github_user(
             if response.status_code == 404:
                 raise HTTPException(status_code=404, detail="GitHub user not found")
             
+            if response.status_code == 403:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="GitHub API rate limit exceeded. Please configure a GitHub token in Settings."
+                )
+            
             response.raise_for_status()
             user_info = response.json()
     
-    except httpx.HTTPError:
-        raise HTTPException(status_code=400, detail="Failed to fetch user from GitHub")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="GitHub user not found")
+        elif e.response.status_code == 403:
+            raise HTTPException(
+                status_code=400, 
+                detail="GitHub API rate limit exceeded. Please configure a GitHub token in Settings."
+            )
+        else:
+            logger.error(f"GitHub API error: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(status_code=400, detail=f"GitHub API error: {e.response.status_code}")
+    except httpx.RequestError as e:
+        logger.error(f"Request error: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to connect to GitHub API")
     
     # Check if user is already being monitored
     existing_user = db.query(GitHubUser).filter(
@@ -375,8 +395,11 @@ async def sync_selected_repositories(
             selection.repository_id = repository.id
             selection.status = SelectionStatus.SYNCED
             
-            # Trigger background sync
-            sync_repository.delay(repository.id)
+            # Trigger background sync (optional - can be done later)
+            try:
+                sync_repository.delay(repository.id)
+            except Exception as e:
+                logger.warning(f"Failed to queue background sync task: {str(e)}")
             
             synced_count += 1
         else:
@@ -706,8 +729,11 @@ async def sync_selected_organization_repositories(
             selection.repository_id = repository.id
             selection.status = SelectionStatus.SYNCED
             
-            # Trigger background sync
-            sync_repository.delay(repository.id)
+            # Trigger background sync (optional - can be done later)
+            try:
+                sync_repository.delay(repository.id)
+            except Exception as e:
+                logger.warning(f"Failed to queue background sync task: {str(e)}")
             
             synced_count += 1
         else:
