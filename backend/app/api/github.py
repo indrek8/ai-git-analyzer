@@ -20,6 +20,12 @@ from app.repositories.github import GitHubClient
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Import background tasks at module level to avoid import issues
+try:
+    from app.background.tasks import cleanup_deselected_repositories, cleanup_orphaned_data
+except ImportError as e:
+    logger.warning(f"Could not import background tasks: {e}")
+
 # Pydantic models for request/response
 class GitHubUserResponse(BaseModel):
     id: int
@@ -335,6 +341,15 @@ async def bulk_update_repository_selections(
     )
     
     db.commit()
+    
+    # If repositories were deselected, trigger cleanup task
+    if status == SelectionStatus.DESELECTED:
+        try:
+            cleanup_deselected_repositories.delay(current_user.id)
+            logger.info(f"Triggered cleanup task for deselected repositories for user {current_user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger cleanup task: {str(e)}")
+    
     
     return {"message": f"Updated {updated_count} repository selections"}
 
@@ -670,6 +685,15 @@ async def bulk_update_organization_repository_selections(
     
     db.commit()
     
+    # If repositories were deselected, trigger cleanup task
+    if status == SelectionStatus.DESELECTED:
+        try:
+            cleanup_deselected_repositories.delay(current_user.id)
+            logger.info(f"Triggered cleanup task for deselected repositories for user {current_user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger cleanup task: {str(e)}")
+    
+    
     return {"message": f"Updated {updated_count} repository selections"}
 
 @router.post("/organizations/{org_id}/repositories/sync-selected")
@@ -769,3 +793,85 @@ async def remove_github_organization(
     db.commit()
     
     return {"message": f"GitHub organization {github_org.login} removed successfully"}
+
+# Background Task Management Endpoints
+@router.post("/cleanup/deselected")
+async def trigger_deselected_cleanup(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Manually trigger cleanup of deselected repositories"""
+    try:
+        task = cleanup_deselected_repositories.delay(current_user.id)
+        
+        return {
+            "message": "Cleanup task started",
+            "task_id": task.id
+        }
+    except Exception as e:
+        logger.error(f"Failed to start cleanup task: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start cleanup task")
+
+@router.post("/cleanup/orphaned")
+async def trigger_orphaned_cleanup(
+    current_user: User = Depends(get_current_user)
+):
+    """Manually trigger cleanup of orphaned data (admin only)"""
+    # TODO: Add admin check when user roles are implemented
+    try:
+        task = cleanup_orphaned_data.delay()
+        
+        return {
+            "message": "Orphaned data cleanup task started",
+            "task_id": task.id
+        }
+    except Exception as e:
+        logger.error(f"Failed to start orphaned cleanup task: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start cleanup task")
+
+@router.get("/tasks/{task_id}/status")
+async def get_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get status of a background task"""
+    try:
+        from celery.result import AsyncResult
+        from app.background.celery_app import celery_app
+        
+        result = AsyncResult(task_id, app=celery_app)
+        
+        if result.state == 'PENDING':
+            response = {
+                'state': result.state,
+                'progress': 0,
+                'status': 'Task is waiting to be processed'
+            }
+        elif result.state == 'PROGRESS':
+            response = {
+                'state': result.state,
+                'progress': result.info.get('progress', 0),
+                'status': result.info.get('status', ''),
+                'current': result.info.get('current', 0),
+                'total': result.info.get('total', 0)
+            }
+        elif result.state == 'SUCCESS':
+            response = {
+                'state': result.state,
+                'progress': 100,
+                'status': 'Task completed successfully',
+                'result': result.result
+            }
+        else:  # FAILURE
+            response = {
+                'state': result.state,
+                'progress': 0,
+                'status': 'Task failed',
+                'error': str(result.info)
+            }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Failed to get task status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get task status")

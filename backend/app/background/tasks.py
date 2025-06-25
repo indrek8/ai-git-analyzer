@@ -1,4 +1,4 @@
-from celery import current_app as celery_app
+from app.background.celery_app import celery_app
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
@@ -47,6 +47,18 @@ def sync_repository(self, repository_id: int):
         # Mark as completed
         repository.sync_status = "completed"
         repository.last_synced_at = datetime.utcnow()
+        
+        # Update corresponding repository selection status to SYNCED
+        from app.models.repository_selection import RepositorySelection, SelectionStatus
+        
+        selection = db.query(RepositorySelection).filter(
+            RepositorySelection.repository_id == repository.id
+        ).first()
+        
+        if selection and selection.status == SelectionStatus.SELECTED:
+            selection.status = SelectionStatus.SYNCED
+            logger.info(f"Updated repository selection {selection.id} status to SYNCED")
+        
         db.commit()
         
         logger.info(f"Successfully synced repository {repository_id}")
@@ -572,6 +584,154 @@ def periodic_refresh_all_github_sources(self):
         
     except Exception as exc:
         logger.error(f"Failed periodic refresh: {str(exc)}")
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def cleanup_deselected_repositories(self, user_id: int):
+    """
+    Background task to cleanup data for deselected repositories
+    """
+    db = SessionLocal()
+    try:
+        from app.models.repository_selection import RepositorySelection, SelectionStatus
+        from app.models.repository import Repository
+        from app.models.commit import Commit
+        from app.models.user import User
+        
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'status': 'Starting cleanup of deselected repositories'})
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise Exception(f"User {user_id} not found")
+        
+        # Find repository selections that are deselected and have linked repositories
+        deselected_selections = db.query(RepositorySelection).filter(
+            RepositorySelection.selected_by_user_id == user_id,
+            RepositorySelection.status == SelectionStatus.DESELECTED,
+            RepositorySelection.repository_id.isnot(None)
+        ).all()
+        
+        total_selections = len(deselected_selections)
+        cleaned_count = 0
+        
+        logger.info(f"Found {total_selections} deselected repositories to cleanup for user {user_id}")
+        
+        for i, selection in enumerate(deselected_selections):
+            self.update_state(state='PROGRESS', meta={
+                'progress': int((i / total_selections) * 80) if total_selections > 0 else 80,
+                'status': f'Cleaning up repository {selection.name} ({i+1}/{total_selections})'
+            })
+            
+            # Get the linked repository
+            repository = db.query(Repository).filter(
+                Repository.id == selection.repository_id,
+                Repository.owner_id == user_id
+            ).first()
+            
+            if repository:
+                # Delete associated commits
+                commits_deleted = db.query(Commit).filter(
+                    Commit.repository_id == repository.id
+                ).delete()
+                
+                # Delete the repository record
+                db.delete(repository)
+                
+                logger.info(f"Deleted repository {repository.name} and {commits_deleted} commits")
+            
+            # Reset the selection to default state (no repository link)
+            selection.repository_id = None
+            selection.status = SelectionStatus.PENDING  # Back to available state
+            selection.selected_at = None
+            
+            cleaned_count += 1
+        
+        db.commit()
+        
+        self.update_state(state='PROGRESS', meta={'progress': 100, 'status': 'Cleanup completed'})
+        
+        logger.info(f"Cleanup completed: {cleaned_count} deselected repositories cleaned for user {user_id}")
+        return {
+            "status": "completed",
+            "user_id": user_id,
+            "cleaned_repositories": cleaned_count
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed to cleanup deselected repositories for user {user_id}: {str(exc)}")
+        raise self.retry(exc=exc, countdown=60, max_retries=3)
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def cleanup_orphaned_data(self):
+    """
+    Periodic task to cleanup orphaned data across the system
+    """
+    db = SessionLocal()
+    try:
+        from app.models.repository_selection import RepositorySelection, SelectionStatus
+        from app.models.repository import Repository
+        from app.models.commit import Commit
+        from app.models.developer import Developer
+        from datetime import timedelta
+        
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'status': 'Starting orphaned data cleanup'})
+        
+        cleanup_stats = {
+            "orphaned_commits": 0,
+            "orphaned_developers": 0,
+            "old_deselected_selections": 0
+        }
+        
+        # 1. Clean up commits for deleted repositories
+        self.update_state(state='PROGRESS', meta={'progress': 20, 'status': 'Cleaning orphaned commits'})
+        
+        orphaned_commits = db.query(Commit).filter(
+            ~Commit.repository_id.in_(
+                db.query(Repository.id)
+            )
+        )
+        cleanup_stats["orphaned_commits"] = orphaned_commits.count()
+        orphaned_commits.delete(synchronize_session=False)
+        
+        # 2. Clean up developers with no commits
+        self.update_state(state='PROGRESS', meta={'progress': 50, 'status': 'Cleaning orphaned developers'})
+        
+        orphaned_developers = db.query(Developer).filter(
+            ~Developer.id.in_(
+                db.query(Commit.developer_id).filter(Commit.developer_id.isnot(None))
+            )
+        )
+        cleanup_stats["orphaned_developers"] = orphaned_developers.count()
+        orphaned_developers.delete(synchronize_session=False)
+        
+        # 3. Clean up old deselected repository selections (older than 30 days)
+        self.update_state(state='PROGRESS', meta={'progress': 80, 'status': 'Cleaning old deselected selections'})
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        old_deselected = db.query(RepositorySelection).filter(
+            RepositorySelection.status == SelectionStatus.DESELECTED,
+            RepositorySelection.repository_id.is_(None),  # Already cleaned up
+            RepositorySelection.updated_at < cutoff_date
+        )
+        cleanup_stats["old_deselected_selections"] = old_deselected.count()
+        old_deselected.delete(synchronize_session=False)
+        
+        db.commit()
+        
+        self.update_state(state='PROGRESS', meta={'progress': 100, 'status': 'Orphaned data cleanup completed'})
+        
+        logger.info(f"Orphaned data cleanup completed: {cleanup_stats}")
+        return {
+            "status": "completed",
+            "cleanup_stats": cleanup_stats
+        }
+        
+    except Exception as exc:
+        logger.error(f"Failed to cleanup orphaned data: {str(exc)}")
         raise
     finally:
         db.close()
