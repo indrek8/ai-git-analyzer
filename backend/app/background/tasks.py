@@ -683,6 +683,7 @@ def cleanup_orphaned_data(self):
         cleanup_stats = {
             "orphaned_commits": 0,
             "orphaned_developers": 0,
+            "orphaned_repositories": 0,
             "old_deselected_selections": 0
         }
         
@@ -697,8 +698,21 @@ def cleanup_orphaned_data(self):
         cleanup_stats["orphaned_commits"] = orphaned_commits.count()
         orphaned_commits.delete(synchronize_session=False)
         
-        # 2. Clean up developers with no commits
-        self.update_state(state='PROGRESS', meta={'progress': 50, 'status': 'Cleaning orphaned developers'})
+        # 2. Clean up repositories not linked to any repository selections
+        self.update_state(state='PROGRESS', meta={'progress': 40, 'status': 'Cleaning orphaned repositories'})
+        
+        orphaned_repositories = db.query(Repository).filter(
+            ~Repository.id.in_(
+                db.query(RepositorySelection.repository_id).filter(
+                    RepositorySelection.repository_id.isnot(None)
+                )
+            )
+        )
+        cleanup_stats["orphaned_repositories"] = orphaned_repositories.count()
+        orphaned_repositories.delete(synchronize_session=False)
+        
+        # 3. Clean up developers with no commits
+        self.update_state(state='PROGRESS', meta={'progress': 60, 'status': 'Cleaning orphaned developers'})
         
         orphaned_developers = db.query(Developer).filter(
             ~Developer.id.in_(
@@ -708,7 +722,7 @@ def cleanup_orphaned_data(self):
         cleanup_stats["orphaned_developers"] = orphaned_developers.count()
         orphaned_developers.delete(synchronize_session=False)
         
-        # 3. Clean up old deselected repository selections (older than 30 days)
+        # 4. Clean up old deselected repository selections (older than 30 days)
         self.update_state(state='PROGRESS', meta={'progress': 80, 'status': 'Cleaning old deselected selections'})
         
         cutoff_date = datetime.utcnow() - timedelta(days=30)

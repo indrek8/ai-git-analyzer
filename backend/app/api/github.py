@@ -441,7 +441,28 @@ async def remove_github_user(
     if not github_user:
         raise HTTPException(status_code=404, detail="GitHub user not found")
     
-    # Remove associated repository selections
+    # Remove associated repository selections and linked repositories
+    selections = db.query(RepositorySelection).filter(
+        RepositorySelection.github_user_id == user_id
+    ).all()
+    
+    # Remove linked repositories and their commits
+    from app.models.repository import Repository
+    from app.models.commit import Commit
+    
+    for selection in selections:
+        if selection.repository_id:
+            # Delete commits for this repository
+            db.query(Commit).filter(
+                Commit.repository_id == selection.repository_id
+            ).delete()
+            
+            # Delete the repository
+            db.query(Repository).filter(
+                Repository.id == selection.repository_id
+            ).delete()
+    
+    # Remove repository selections
     db.query(RepositorySelection).filter(
         RepositorySelection.github_user_id == user_id
     ).delete()
@@ -784,7 +805,28 @@ async def remove_github_organization(
     if not github_org:
         raise HTTPException(status_code=404, detail="GitHub organization not found")
     
-    # Remove associated repository selections
+    # Remove associated repository selections and linked repositories
+    selections = db.query(RepositorySelection).filter(
+        RepositorySelection.github_organization_id == org_id
+    ).all()
+    
+    # Remove linked repositories and their commits
+    from app.models.repository import Repository
+    from app.models.commit import Commit
+    
+    for selection in selections:
+        if selection.repository_id:
+            # Delete commits for this repository
+            db.query(Commit).filter(
+                Commit.repository_id == selection.repository_id
+            ).delete()
+            
+            # Delete the repository
+            db.query(Repository).filter(
+                Repository.id == selection.repository_id
+            ).delete()
+    
+    # Remove repository selections
     db.query(RepositorySelection).filter(
         RepositorySelection.github_organization_id == org_id
     ).delete()
