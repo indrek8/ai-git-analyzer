@@ -336,7 +336,7 @@ def refresh_github_user_repositories(self, github_user_id: int):
         
         # Fetch latest repositories
         import asyncio
-        repos = await asyncio.run(github_client.get_user_repositories(github_user.username))
+        repos = asyncio.run(github_client.get_user_repositories(github_user.username))
         
         self.update_state(state='PROGRESS', meta={'progress': 50, 'status': f'Processing {len(repos)} repositories'})
         
@@ -434,7 +434,7 @@ def refresh_github_organization_repositories(self, github_org_id: int):
         
         # Fetch latest repositories
         import asyncio
-        repos = await asyncio.run(github_client.get_organization_repositories(github_org.login))
+        repos = asyncio.run(github_client.get_organization_repositories(github_org.login))
         
         self.update_state(state='PROGRESS', meta={'progress': 50, 'status': f'Processing {len(repos)} repositories'})
         

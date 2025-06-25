@@ -23,3 +23,9 @@ class User(Base):
     # Relationships
     repositories = relationship("Repository", back_populates="owner")
     developers = relationship("Developer", back_populates="user")
+    
+    def __str__(self):
+        return f"User({self.username})"
+    
+    def __repr__(self):
+        return f"<User id={self.id} username={self.username}>"
